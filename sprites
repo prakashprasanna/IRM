@@ -1,0 +1,90 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Graphics;
+
+namespace AlienRaid {
+	public class Sprite {
+		public Texture2D Texture { get; private set; }
+		public Vector2 Position;
+		public Vector2 Velocity;
+		public Vector2 Origin;
+		public bool Active = true;
+		public float Scale = 1;
+		public float Rotation;
+		public float ZLayer;
+		public Color Color = Color.White;
+
+		public int TotalFrames { get; private set; }
+		public TimeSpan AnimationInterval;
+			public bool OneShotAnimation;
+			public bool DeactivateOnAnimationOver = true;
+
+		private Rectangle[] _rects;
+		private int _currentFrame;
+		private TimeSpan _animElapsed;
+
+		public int FrameWidth { get { return _rects == null ? Texture.Width : _rects[0].Width; } }
+		public int FrameHeight { get { return _rects == null ? Texture.Height : _rects[0].Height; } }
+
+		public Sprite(Texture2D texture, Rectangle? firstRect = null, int frames = 1, bool horizontal = true, int space = 0) {
+			Texture = texture;
+			TotalFrames = frames;
+			if(firstRect != null) {
+				_rects = new Rectangle[frames];
+				Rectangle first = (Rectangle)firstRect;
+				for(int i = 0; i < frames; i++)
+					_rects[i] = new Rectangle(first.Left + (horizontal ? (first.Width + space) * i : 0),
+						first.Top + (horizontal ? 0 : (first.Height + space) * i), first.Width, first.Height);
+			}
+			else
+				_rects = new Rectangle[] { new Rectangle(0, 0, texture.Width, texture.Height) };
+		}
+
+		public virtual void Update(GameTime gameTime) {
+			if(Active) {
+				if(TotalFrames > 1 && (_animElapsed += gameTime.ElapsedGameTime) > AnimationInterval) {
+					if(++_currentFrame == TotalFrames) {
+						_currentFrame = 0;
+						if(OneShotAnimation) {
+							_currentFrame = TotalFrames - 1;
+							if(DeactivateOnAnimationOver)
+								Active = false;
+						}
+					}
+					_animElapsed -= AnimationInterval;
+				}
+				Position += Velocity;
+			}
+		}
+
+		public virtual void Draw(GameTime gameTime, SpriteBatch batch) {
+			if(Active) {
+				batch.Draw(Texture, Position, _rects == null ? null : (Rectangle?)_rects[_currentFrame], 
+					Color, Rotation, Origin, Scale, SpriteEffects.None, ZLayer);
+			}
+		}
+
+		public int ActualWidth {
+			get { return (int)(FrameWidth * Scale); }
+		}
+
+		public int ActualHeight {
+			get { return (int)(FrameHeight * Scale); }
+		}
+
+		public Rectangle BoundingRect {
+			get { 
+				return new Rectangle(
+					(int)(Position.X - Origin.X * Scale), (int)(Position.Y - Origin.Y * Scale), 
+					(int)(_rects[0].Width * Scale), (int)(_rects[0].Height * Scale)); 
+			}
+		}
+
+		public virtual bool Collide(Sprite other) {
+			return Active && other.Active && BoundingRect.Intersects(other.BoundingRect);
+		}
+	}
+}
